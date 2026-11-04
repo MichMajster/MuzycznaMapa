@@ -1,5 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import YouTubePlayer from './YouTubePlayer';
+// import MapWithGeolocation from './MapWithGeolocation';
+import UseLocationTest from './GeolocationTest';
+import LeafletMap from './LeafletMap';
+// import GridLayer from './GridLayer';
+
 
 const API_BASE = 'http://localhost:5205';
 
@@ -9,7 +14,8 @@ function App() {
   const [currentIdx, setCurrentIdx] = useState(0);
   const [text, setText] = useState("");
 
-  const [tileId, setTileId] = useState('53_10'); // póki co używam domyslnie 53_10 !!!
+  // const [tileId, setTileId] = useState('53_09'); // póki co używam domyslnie 53_10 !!!
+  const [tileId, setTileId] = useState('');
   const [urlText, setUrlText] = useState('');
   const [statusMsg, setStatusMsg] = useState('');
 
@@ -33,42 +39,72 @@ function App() {
   // ładuje kolejkę na starcie aplikacji
   useEffect(() => {
     loadQueueForTile(tileId);
-  }, []);
+  }, [tileId]);
 
-  // DODAWANIE PIOSENKI POD KOORDYNAT DO C#
   const addSongToTile = async () => {
-    if (!urlText.trim() || !tileId.trim()) return;
+    const trimmedUrl = urlText.trim();
+    const trimmedTile = String(tileId ?? '').trim();
 
-    // Wyciągamy 11-znakowe ID z linku
-    const match = urlText.match(/(?:v=|youtu\.be\/|embed\/)([a-zA-Z0-9_-]{11})/);
-    const videoId = match ? match[1] : urlText.trim();
+    if (!trimmedUrl) {
+      setStatusMsg('Wklej link do piosenki');
+      return;
+    }
+    if (!trimmedTile) {
+      setStatusMsg('Wybierz kafelek (brak tileId)');
+      return;
+    }
+
+    // 11-znakowe ID z linku (też z youtube.com/shorts/ i watch?v=)
+    const match = trimmedUrl.match(
+      /(?:v=|youtu\.be\/|embed\/|shorts\/)([a-zA-Z0-9_-]{11})/
+    );
+    const videoId = match ? match[1] : trimmedUrl;
+
+    // jeśli to raczej nie ID - nie wysyłaj śmieci do bazy
+    if (!/^[a-zA-Z0-9_-]{11}$/.test(videoId)) {
+      setStatusMsg('Nieprawidłowy link lub ID filmu');
+      return;
+    }
 
     setStatusMsg('Zapisywanie...');
 
     try {
-      // POST /api/queue/{tileId} do C#
-      const response = await fetch(`${API_BASE}/api/queue/${tileId}`, {
+      const url = `${API_BASE}/api/queue/${encodeURIComponent(trimmedTile)}`;
+      const payload = {
+        videoId,
+        title: `Piosenka (${videoId})`,
+      };
+
+      console.log('POST', url, payload); // podgląd w DevTools -> Console
+
+      const response = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          videoId: videoId,
-          title: `Piosenka (${videoId})`
-        })
+        body: JSON.stringify(payload),
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        setStatusMsg(`Błąd: ${errorData.message || 'Nie dodano'}`);
+        // Odpowiedź błędu nie musi być JSONem - może być zwykłym tekstem
+        const raw = await response.text();
+        let message = raw;
+        try {
+          const parsed = JSON.parse(raw);
+          message = parsed.message || parsed.title || raw;
+        } catch { /* zostaje surowy tekst */ }
+
+        console.error('Błąd API:', response.status, raw);
+        setStatusMsg(`Błąd ${response.status}: ${message || 'Nie dodano'}`);
         return;
       }
 
-      // odświeżenie załadowanych danych
       setUrlText('');
-      await loadQueueForTile(tileId);
+      await loadQueueForTile(trimmedTile);
+      setStatusMsg('Dodano do kolejki ✓');
     } catch (err) {
-      setStatusMsg('Błąd połączenia z serwerem');
-    }
-  };
+    console.error('Błąd fetch:', err);
+    setStatusMsg(`Błąd połączenia: ${err.message}`);
+  }};
+
 
   // USUWANIE PIOSENKI Z C#
   const removeSongFromTile = async (videoId) => {
@@ -85,31 +121,25 @@ function App() {
 
   const currentSong = queue[currentIdx];
 
-  // funkcja dodająca nowy utwór do listy
-  const addSong = () => {
-    if (text.trim() === "") return; //jesli same biale znaki - ignoruj
+  // const addSong = () => {
+  //   if (text.trim() === "") return; //jesli same biale znaki - ignoruj
     
-    const match = text.match(/(?:v=|youtu\.be\/|embed\/)([a-zA-Z0-9_-]{11})/);
+  //   const match = text.match(/(?:v=|youtu\.be\/|embed\/)([a-zA-Z0-9_-]{11})/);
   
-    // jesli znaleziono match, bierze samo ID (grupa 1 z text.match), else - caly tekst
-    const finalTitle = match ? match[1] : text;
+  //   // jesli znaleziono match, bierze samo ID (grupa 1 z text.match), else - caly tekst
+  //   const finalTitle = match ? match[1] : text;
 
-    // tworzymy nową tablicę z dodanym elementem i przekazujemy do setQueue
-    // React widzi zmianę w 'setQueue' i automatycznie aktualizuje widok
-    setQueue([...queue, finalTitle]); 
-    setText(""); // czysci pole tekstowe
-  };
-
-  const removeSong = (indexToRemove) => {
-    // filtruje tablicę, usuwając element o danym indeksie
-    setQueue(queue.filter((_, index) => index !== indexToRemove));
-  };
-
-  // const handleVideoEnded = () => {
-  //   if (currentIdx + 1 < queue.length) {
-  //     setCurrentIdx(currentIdx + 1);
-  //   }
+  //   // tworzymy nową tablicę z dodanym elementem i przekazujemy do setQueue
+  //   // React widzi zmianę w 'setQueue' i automatycznie aktualizuje widok
+  //   setQueue([...queue, finalTitle]); 
+  //   setText(""); // czysci pole tekstowe
   // };
+
+  // const removeSong = (indexToRemove) => {
+  //   // filtruje tablicę, usuwając element o danym indeksie
+  //   setQueue(queue.filter((_, index) => index !== indexToRemove));
+  // };
+
   const handleVideoEnded = () => {
     setCurrentIdx((prevIdx) => {
       if (prevIdx + 1 < queue.length) {
@@ -124,7 +154,12 @@ function App() {
   ? queue[currentIdx].videoId
   : queue[currentIdx];
 
-  //wygląd strony (JSX)
+  const handleSelectTile = (id) => {
+    setTileId(id);
+    loadQueueForTile(id);
+  };
+
+  //wygląd strony //////////////////////////////////////////////////////////////////////////////////////////////
   return (
     <div style={{ padding: '20px' }}>
       <h2>Kolejka zawiera {queue.length} piosenki.</h2>
@@ -137,14 +172,19 @@ function App() {
         onEnded={handleVideoEnded} 
       />
 
-      <input 
+      {/* <input 
         type="text" 
         value={text} 
         onChange={(e) => setText(e.target.value)} // Aktualizuje zmienną "text" przy każdym wpisanym znaku
         placeholder="Wpisz nazwę piosenki..."
       />
-      <button onClick={addSong}>Dodaj</button>
-
+      <button onClick={addSong}>Dodaj</button> */}
+      <div style={{ width: '640px', margin: '0 auto' }}>
+        <LeafletMap onSelectTile={handleSelectTile} />
+      </div>
+      
+      {/* <UseLocationTest /> */}
+      
       {/* Wyświetlanie listy przy użyciu map() */}
       <ul>
         {Array.isArray(queue) && queue.map((song, index) => {
@@ -192,7 +232,8 @@ function App() {
           onChange={(e) => setTileId(e.target.value)} 
           placeholder="np. 53_10"
         />
-        <button onClick={() => loadQueueForTile(tileId)}>Wczytaj kafel</button>
+        {/* <button onClick={() => loadQueueForTile(tileId)}>Wczytaj kafel</button> */}
+        <button onClick={() => handleSelectTile(tileId)}>Wczytaj kafel</button>
       </div>
 
       {/* Formularz dodawania piosenki */}
@@ -206,6 +247,7 @@ function App() {
         />
         <button onClick={addSongToTile}>+ Dodaj do koordynatu</button>
       </div>
+      <p>{statusMsg}</p>
     </div>
 
   );

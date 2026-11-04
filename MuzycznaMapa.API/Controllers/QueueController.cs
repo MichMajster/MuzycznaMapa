@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
-using System.Collections.Concurrent;
+using Microsoft.EntityFrameworkCore;
+using MuzycznaMapa.API.Data;
+using MuzycznaMapa.API.Models;
 
 namespace MuzycznaMapa.API.Controllers;
 
@@ -7,44 +9,65 @@ namespace MuzycznaMapa.API.Controllers;
 [Route("api/[controller]")]
 public class QueueController : ControllerBase
 {
-    // ConcurrentDictionary zezwala na jednoczesną prace dla wielu wątków/użytkowników
-    private static readonly ConcurrentDictionary<string, List<SongDto>> TileQueues = new();
+    private readonly AppDbContext _context;
+
+    public QueueController(AppDbContext context)
+    {
+        _context = context;
+    }
 
     // GET: api/queue/53_10
     [HttpGet("{tileId}")]
-    public IActionResult GetQueue(string tileId)
+    public async Task<IActionResult> GetQueue(string tileId)
     {
-        if (!TileQueues.ContainsKey(tileId))
-        {
-            // zwraca pustą listę, jeśli nic jeszcze nie dodano
-            return Ok(new List<SongDto>());
-        }
+        var songs = await _context.Songs
+            .Where(s => s.TileId == tileId)
+            .OrderBy(s => s.CreatedAt)
+            .Select(s => new
+            {
+                videoId = s.VideoId,
+                title = s.Title
+            })
+            .ToListAsync();
 
-        return Ok(TileQueues[tileId]);
+        return Ok(songs);
     }
 
     // POST: api/queue/53_10
     [HttpPost("{tileId}")]
-    public IActionResult AddSong(string tileId, [FromBody] SongDto song)
+    public async Task<IActionResult> AddSong(string tileId, [FromBody] SongDto songDto)
     {
-        if (string.IsNullOrWhiteSpace(song.VideoId))
+        if (string.IsNullOrWhiteSpace(songDto.VideoId))
         {
             return BadRequest(new { message = "Brak VideoId" });
         }
 
-        var queue = TileQueues.GetOrAdd(tileId, _ => new List<SongDto>());
-        queue.Add(song);
+        var newSong = new Song
+        {
+            TileId = tileId,
+            VideoId = songDto.VideoId,
+            Title = songDto.Title,
+            CreatedAt = DateTime.UtcNow
+        };
 
-        return Ok(queue);
+        _context.Songs.Add(newSong);
+        await _context.SaveChangesAsync();
+
+        return await GetQueue(tileId);
     }
 
     // DELETE: api/queue/53_10/...
     [HttpDelete("{tileId}/{videoId}")]
-    public IActionResult RemoveSong(string tileId, string videoId)
+    public async Task<IActionResult> RemoveSong(string tileId, string videoId)
     {
-        if (TileQueues.TryGetValue(tileId, out var queue))
+        var songsToRemove = await _context.Songs
+            .Where(s => s.TileId == tileId && s.VideoId == videoId)
+            .ToListAsync();
+
+        if (songsToRemove.Any())
         {
-            queue.RemoveAll(s => s.VideoId == videoId);
+            _context.Songs.RemoveRange(songsToRemove);
+            await _context.SaveChangesAsync();
         }
 
         return Ok();
