@@ -1,0 +1,304 @@
+:root {
+  --gap: 16px;
+  --side-w: max(20vw, 280px);
+  --player-h: calc(var(--side-w) * 9 / 16);
+  --card-bg: rgba(255, 255, 255, 0.92);
+  --card-radius: 18px;
+  --card-shadow: 0 6px 24px rgba(0, 0, 0, 0.28);
+}
+ 
+/* wyzerowanie domyślnych stylów szablonu Vite (padding/max-width na #root, flex na body) */
+html, body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  display: block;
+  min-width: 0;
+  place-items: initial;
+}
+ 
+#root {
+  max-width: none;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  text-align: left;
+  border: 0;
+  min-height: 0;
+  display: block;
+}
+ 
+/* fixed + inset:0 zamiast 100vw/100vh, więc nie wychodzi poza ekran (pasek przewijania, pasek adresu na telefonie) */
+.app {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  font-family: system-ui, sans-serif;
+}
+
+/* mapa na cały ekran */
+.map-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+}
+
+/* kontrolki Leafleta: zoom pod paskiem przycisków, atrybucja z dala od playera */
+.leaflet-top.leaflet-left {
+  /* margin-top: 130px;
+  margin-left: 6px; */
+  display: none;
+}
+
+.leaflet-bottom.leaflet-left {
+  /* margin-top: 130px;
+  margin-left: 6px; */
+  display: none;
+}
+
+.leaflet-control-attribution {
+  display: none;
+}
+
+/* pływający pasek przycisków */
+.rail {
+  position: absolute;
+  top: var(--gap);
+  left: var(--gap);
+  z-index: 2000;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px;
+  border-radius: var(--card-radius);
+  background: var(--card-bg);
+  backdrop-filter: blur(8px);
+  box-shadow: var(--card-shadow);
+}
+.rail button {
+  width: 44px;
+  height: 44px;
+  font-size: 20px;
+  border: none;
+  border-radius: 12px;
+  background: transparent;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.rail button:hover {
+  background: #eef2f7;
+}
+.rail button.active {
+  background: #dbeafe;
+}
+
+/* pływające karty-panele */
+.panel {
+  position: absolute;
+  z-index: 1500;
+  box-sizing: border-box;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  border-radius: var(--card-radius);
+  background: var(--card-bg);
+  backdrop-filter: blur(8px);
+  box-shadow: var(--card-shadow);
+  opacity: 0;
+  pointer-events: none;
+  transition: transform 0.3s ease, opacity 0.3s ease;
+}
+.panel.open {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateX(0);
+}
+
+/* lewy: mała karta obok paska, wysokość wg zawartości */
+.panel-left {
+  top: var(--gap);
+  left: calc(var(--gap) + 76px);
+  width: 280px;
+  transform: translateX(-24px);
+}
+
+/* prawy: od góry do tuż nad playerem, dół zawsze wolny */
+.panel-right {
+  top: var(--gap);
+  right: var(--gap);
+  width: var(--side-w);
+  bottom: calc(var(--gap) * 2 + var(--player-h));
+  transform: translateX(calc(100% + var(--gap)));
+}
+
+.panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.panel-header h3 {
+  margin: 0;
+}
+.close {
+  border: none;
+  background: none;
+  font-size: 18px;
+  /* color: #000000; */
+  cursor: pointer;
+}
+
+.panel label {
+  display: block;
+  margin: 12px 0 4px;
+  font-size: 13px;
+  color: #555;
+}
+.panel input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 6px 8px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+}
+.panel button:not(.close) {
+  padding: 6px 10px;
+  border: none;
+  border-radius: 8px;
+  background: #e2e8f0;
+  cursor: pointer;
+}
+.panel .row {
+  display: flex;
+  gap: 6px;
+}
+.panel .row input {
+  flex: 1;
+}
+.panel .primary {
+  margin-top: 12px;
+  width: 100%;
+  padding: 8px;
+  background: #2563eb !important;
+  color: #fff;
+}
+
+.muted {
+  color: #666;
+  font-size: 13px;
+}
+
+/* lista piosenek przewija się wewnątrz karty */
+.song-list {
+  list-style: none;
+  padding: 0;
+  margin: 8px 0;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+.song-list li {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 0;
+  border-bottom: 1px solid #eee;
+}
+.song-list li.current {
+  font-weight: bold;
+}
+.song-list li button {
+  padding: 2px 8px;
+}
+.song-title {
+  cursor: pointer;
+  flex: 1;
+  font-size: 13px;
+}
+
+.geo {
+  flex-shrink: 0;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid #e5e7eb;
+  font-size: 13px;
+}
+.geo h4 {
+  margin: 0 0 4px;
+}
+
+/* odtwarzacz: zaokrąglona karta w prawym dolnym rogu */
+.player {
+  position: absolute;
+  right: var(--gap);
+  bottom: var(--gap);
+  width: var(--side-w);
+  aspect-ratio: 16 / 9;
+  z-index: 1600;
+  border-radius: var(--card-radius);
+  overflow: hidden;
+  background: #000;
+  box-shadow: var(--card-shadow);
+}
+.player iframe {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* popup kafelka (przycisk dodawania) - w stylu pozostałych kart */
+.tile-popup .leaflet-popup-content-wrapper {
+  padding: 6px;
+  border-radius: var(--card-radius);
+  background: var(--card-bg);
+  backdrop-filter: blur(8px);
+  box-shadow: var(--card-shadow);
+}
+.tile-popup .leaflet-popup-content {
+  margin: 0;
+}
+.tile-popup .leaflet-popup-tip {
+  background: var(--card-bg);
+  box-shadow: var(--card-shadow);
+}
+.tile-popup-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border: none;
+  border-radius: 12px;
+  background: #2563eb;
+  color: #fff;
+  font: 600 14px system-ui, sans-serif;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 0.2s, transform 0.1s;
+}
+.tile-popup-btn:hover {
+  background: #1d4ed8;
+}
+.tile-popup-btn:active {
+  transform: scale(0.97);
+}
+.tile-popup-icon {
+  font-size: 14px;
+  line-height: 1;
+}
+
+/* komunikat statusu na środku dołu */
+.status {
+  position: absolute;
+  left: 50%;
+  bottom: var(--gap);
+  transform: translateX(-50%);
+  z-index: 2000;
+  max-width: 40vw;
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.75);
+  color: #fff;
+  font-size: 13px;
+}

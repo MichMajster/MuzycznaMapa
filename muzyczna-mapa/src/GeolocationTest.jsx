@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import LeafletMap from './LeafletMap';
-
+//                                                        TEN PLIK NIE JEST JUZ UŻYWANY, TYLKO DO TESTÓW
 export default function UseLocationTest() {
   const [coords, setCoords] = useState(null); // koordynaty GPS { lat, lng }
   const [status, setStatus] = useState('Pobieranie lokalizacji...');
@@ -34,20 +34,14 @@ export default function UseLocationTest() {
 
   return (
     <div>
-      {/* <div style={{ width: '640px', margin: '0 auto' }}>
-        <LeafletMap coords={coords}/>
-      </div> */}
-
-
-      <p>.</p>
-      <p>.</p>
-      <p><strong>Status:</strong> {status}</p>
+      
       {coords && (
         <ul>
           <li>Szerokość (Lat): <strong>{coords.lat}</strong></li>
           <li>Długość (Lon): <strong>{coords.lng}</strong></li>
         </ul>
       )}
+      <p><strong>Status:</strong> {status}</p>
       
     </div>
   );
